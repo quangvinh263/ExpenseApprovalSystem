@@ -3,4 +3,13 @@
   <Folder Name="/src/Api/">
     <Project Path="src/Api/ExpenseApproval.Api.csproj" />
   </Folder>
+  <Folder Name="/src/Application/">
+    <Project Path="src/Application/ExpenseApproval.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Domain/">
+    <Project Path="src/Domain/ExpenseApproval.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/ExpenseApproval.Infrastructure.csproj" />
+  </Folder>
 </Solution>
