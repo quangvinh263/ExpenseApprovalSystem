@@ -1,30 +1,58 @@
 # Database Schema: Expense Approval System
-Hệ thống sử dụng PostgreSQL. Các bảng cốt lõi:
+
+The system uses PostgreSQL. The schema below is for the MVP phase.
 
 ## 1. Departments
-- `Id` (Guid, PK)
-- `Name` (string)
-- `MonthlyBudget` (decimal)
+| Column | Type | Note |
+|--------|------|------|
+| Id | uuid (PK) | |
+| Name | varchar(100) | |
+| MonthlyBudget | decimal(18,2) | Monthly allocated budget |
+| IsActive | boolean | default true |
+| CreatedAt | timestamptz | |
 
 ## 2. Users
-- `Id` (Guid, PK)
-- `FullName`, `Email` (string)
-- `Role` (Enum: Employee, Manager, Accountant)
-- `DepartmentId` (Guid, FK)
+| Column | Type | Note |
+|--------|------|------|
+| Id | uuid (PK) | |
+| FullName | varchar(150) | |
+| Email | varchar(150) | unique |
+| PasswordHash | text | |
+| Role | varchar(30) | Employee, TeamLead, Manager, Accountant, Admin |
+| DepartmentId | uuid (FK → Departments) | nullable for Admin |
+| IsActive | boolean | default true |
+| CreatedAt | timestamptz | |
 
 ## 3. ExpenseRequests
-- `Id` (Guid, PK)
-- `RequesterId` (Guid, FK -> Users)
-- `Amount` (decimal)
-- `Reason` (string)
-- `ReceiptUrl` (string, nullable)
-- `Status` (Enum: Draft, Pending_Audit, Pending_Manager, Approved, Rejected, Paid)
-- `CreatedAt`, `UpdatedAt` (DateTimeOffset)
-- `RowVersion` (byte[], Concurrency Token xử lý Race Condition)
+| Column | Type | Note |
+|--------|------|------|
+| Id | uuid (PK) | |
+| RequesterId | uuid (FK → Users) | |
+| DepartmentId | uuid (FK → Departments) | Snapshot of user's dept at creation time |
+| Amount | decimal(18,2) | |
+| Category | varchar(50) | Travel, Meal, Hotel, Supplies, Other |
+| Reason | text | |
+| ReceiptUrl | text | nullable (link to receipt file) |
+| Status | varchar(30) | Draft, Submitted, PendingApproval, Approved, Rejected, Paid |
+| CurrentApproverRole | varchar(30) | nullable – role currently required to approve |
+| CreatedAt | timestamptz | |
+| UpdatedAt | timestamptz | |
+| RowVersion | bytea | Concurrency token |
 
-## 4. AuditLogs (Append-only)
-- `Id` (Guid, PK)
-- `ExpenseRequestId` (Guid, FK)
-- `ActionBy` (string)
-- `Action` (string)
-- `Timestamp` (DateTimeOffset)
+## 4. ApprovalHistories
+| Column | Type | Note |
+|--------|------|------|
+| Id | uuid (PK) | |
+| ExpenseRequestId | uuid (FK → ExpenseRequests) | |
+| ActionByUserId | uuid (FK → Users) | |
+| Action | varchar(30) | Submit, Approve, Reject, MarkPaid |
+| FromStatus | varchar(30) | |
+| ToStatus | varchar(30) | |
+| Comment | text | nullable |
+| CreatedAt | timestamptz | |
+
+## Business Notes
+- Basic Flow: Draft → Submitted → PendingApproval → Approved → Paid.
+- Can be Rejected at the PendingApproval step.
+- `ApprovalHistories` is append-only (no updates/deletes).
+- Version 1 (MVP) does not need a separate Budget table; rely on `Departments.MonthlyBudget`.
