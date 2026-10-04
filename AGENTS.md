@@ -5,7 +5,7 @@ This is an internal **Expense Approval System** built with ASP.NET Core.
 Employees submit expense claims (travel, meals, supplies...), managers approve them through a multi-level workflow, and accounting processes reimbursement.
 
 ## Tech Stack
-- ASP.NET Core 8 (Web API)
+- ASP.NET Core 9 (Web API)
 - Entity Framework Core
 - PostgreSQL (preferred) or SQL Server
 - Clean Architecture (Domain → Application → Infrastructure → API)
