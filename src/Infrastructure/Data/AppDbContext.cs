@@ -1,14 +1,17 @@
+using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseApproval.Infrastructure.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), IApplicationDbContext
 {
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<User> Users => Set<User>();
     public DbSet<ExpenseRequest> ExpenseRequests => Set<ExpenseRequest>();
     public DbSet<ApprovalHistory> ApprovalHistories => Set<ApprovalHistory>();
+
+    public void AddExpenseRequest(ExpenseRequest expenseRequest) => ExpenseRequests.Add(expenseRequest);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

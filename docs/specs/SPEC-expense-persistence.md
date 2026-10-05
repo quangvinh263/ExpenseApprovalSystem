@@ -10,7 +10,7 @@ Entity Framework Core.
 
 ## Tech Stack
 
-- C# / .NET 8
+- C# / .NET 9
 - Entity Framework Core with PostgreSQL
 - Clean Architecture: Domain entities, Infrastructure persistence mapping
 
