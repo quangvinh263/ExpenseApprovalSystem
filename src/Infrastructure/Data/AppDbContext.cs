@@ -11,7 +11,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ExpenseRequest> ExpenseRequests => Set<ExpenseRequest>();
     public DbSet<ApprovalHistory> ApprovalHistories => Set<ApprovalHistory>();
 
+    public async Task<ExpenseRequest?> GetExpenseRequestAsync(
+        Guid expenseRequestId,
+        CancellationToken cancellationToken = default) =>
+        await ExpenseRequests.SingleOrDefaultAsync(
+            expenseRequest => expenseRequest.Id == expenseRequestId,
+            cancellationToken);
+
     public void AddExpenseRequest(ExpenseRequest expenseRequest) => ExpenseRequests.Add(expenseRequest);
+    public void UpdateExpenseRequest(ExpenseRequest expenseRequest) => ExpenseRequests.Update(expenseRequest);
+    public void AddApprovalHistory(ApprovalHistory approvalHistory) => ApprovalHistories.Add(approvalHistory);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
