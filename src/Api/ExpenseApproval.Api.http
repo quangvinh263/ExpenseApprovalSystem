@@ -37,3 +37,11 @@ Content-Type: application/json
   "userId": "33333333-3333-3333-3333-333333333333",
   "comment": "Thiếu hóa đơn đính kèm, từ chối"
 }
+
+### 5. Thanh toán đơn (Mark Paid) - Dùng ID của Accountant
+POST http://localhost:5119/api/expenses/31861e07-49f1-4ef5-a98c-73220c55f333/pay
+Content-Type: application/json
+
+{
+  "userId": "55555555-5555-5555-5555-555555555555"
+}

@@ -84,6 +84,38 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         }
     }
 
+    [HttpPost("{id:guid}/pay")]
+    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> MarkPaid(
+        Guid id,
+        [FromBody] SubmitExpenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var expenseRequestId = await sender.Send(
+                new MarkExpensePaidCommand(id, request.UserId),
+                cancellationToken);
+
+            return Ok(new ApiResponse<Guid>(expenseRequestId));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
+        catch (InvalidOperationException)
+        {
+            return Conflict();
+        }
+    }
+
     [HttpPost("{id:guid}/reject")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
