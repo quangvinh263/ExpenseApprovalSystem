@@ -14,7 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public async Task<ExpenseRequest?> GetExpenseRequestAsync(
         Guid expenseRequestId,
         CancellationToken cancellationToken = default) =>
-        await ExpenseRequests.SingleOrDefaultAsync(
+        await ExpenseRequests.AsNoTracking().SingleOrDefaultAsync(
             expenseRequest => expenseRequest.Id == expenseRequestId,
             cancellationToken);
 
