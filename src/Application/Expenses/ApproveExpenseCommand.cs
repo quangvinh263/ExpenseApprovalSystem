@@ -5,4 +5,5 @@ namespace ExpenseApproval.Application.Expenses;
 public sealed record ApproveExpenseCommand(
     Guid ExpenseRequestId,
     Guid ApproverId,
-    string? Comment) : IRequest<Guid>;
+    string? Comment,
+    byte[] RowVersion) : IRequest<Guid>;

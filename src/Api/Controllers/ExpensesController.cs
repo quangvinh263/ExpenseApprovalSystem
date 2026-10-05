@@ -9,8 +9,8 @@ namespace ExpenseApproval.Api.Controllers;
 [Route("api/expenses")]
 public sealed class ExpensesController(ISender sender) : ControllerBase
 {
-    public sealed record SubmitExpenseRequest(Guid UserId);
-    public sealed record ExpenseActionRequest(Guid UserId, string? Comment);
+    public sealed record SubmitExpenseRequest(Guid UserId, byte[] RowVersion);
+    public sealed record ExpenseActionRequest(Guid UserId, string? Comment, byte[] RowVersion);
 
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
@@ -37,7 +37,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         try
         {
             var expenseRequestId = await sender.Send(
-                new SubmitExpenseCommand(id, request.UserId),
+                new SubmitExpenseCommand(id, request.UserId, request.RowVersion),
                 cancellationToken);
 
             return Ok(new ApiResponse<Guid>(expenseRequestId));
@@ -45,6 +45,14 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { error = exception.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
         }
         catch (InvalidOperationException)
         {
@@ -65,7 +73,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         try
         {
             var expenseRequestId = await sender.Send(
-                new ApproveExpenseCommand(id, request.UserId, request.Comment),
+                new ApproveExpenseCommand(id, request.UserId, request.Comment, request.RowVersion),
                 cancellationToken);
 
             return Ok(new ApiResponse<Guid>(expenseRequestId));
@@ -76,7 +84,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         }
         catch (UnauthorizedAccessException)
         {
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden);
         }
         catch (InvalidOperationException)
         {
@@ -97,7 +105,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         try
         {
             var expenseRequestId = await sender.Send(
-                new MarkExpensePaidCommand(id, request.UserId),
+                new MarkExpensePaidCommand(id, request.UserId, request.RowVersion),
                 cancellationToken);
 
             return Ok(new ApiResponse<Guid>(expenseRequestId));
@@ -130,7 +138,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         try
         {
             var expenseRequestId = await sender.Send(
-                new RejectExpenseCommand(id, request.UserId, request.Comment),
+                new RejectExpenseCommand(id, request.UserId, request.Comment, request.RowVersion),
                 cancellationToken);
 
             return Ok(new ApiResponse<Guid>(expenseRequestId));
@@ -145,7 +153,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         }
         catch (UnauthorizedAccessException)
         {
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden);
         }
         catch (InvalidOperationException)
         {

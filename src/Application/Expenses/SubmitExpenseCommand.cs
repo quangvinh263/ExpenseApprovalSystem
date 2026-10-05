@@ -4,4 +4,5 @@ namespace ExpenseApproval.Application.Expenses;
 
 public sealed record SubmitExpenseCommand(
     Guid ExpenseRequestId,
-    Guid UserId) : IRequest<Guid>;
+    Guid UserId,
+    byte[] RowVersion) : IRequest<Guid>;

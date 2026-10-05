@@ -50,10 +50,11 @@ public sealed class MarkExpensePaidCommandHandler(IApplicationDbContext dbContex
         {
             Status = PaidStatus,
             CurrentApproverRole = null,
-            UpdatedAt = now
+            UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
         };
 
-        dbContext.UpdateExpenseRequest(paidExpenseRequest);
+        dbContext.UpdateExpenseRequest(paidExpenseRequest, request.RowVersion);
         dbContext.AddApprovalHistory(new ApprovalHistory
         {
             Id = Guid.NewGuid(),

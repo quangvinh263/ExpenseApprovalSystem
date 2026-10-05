@@ -43,10 +43,11 @@ public sealed class ApproveExpenseCommandHandler(IApplicationDbContext dbContext
         {
             Status = ApprovedStatus,
             CurrentApproverRole = null,
-            UpdatedAt = now
+            UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
         };
 
-        dbContext.UpdateExpenseRequest(approvedExpenseRequest);
+        dbContext.UpdateExpenseRequest(approvedExpenseRequest, request.RowVersion);
         dbContext.AddApprovalHistory(new ApprovalHistory
         {
             Id = Guid.NewGuid(),

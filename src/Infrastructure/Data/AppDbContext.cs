@@ -25,9 +25,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             user => user.Id == userId,
             cancellationToken);
 
+    public async Task<Department?> GetDepartmentAsync(
+        Guid departmentId,
+        CancellationToken cancellationToken = default) =>
+        await Departments.AsNoTracking().SingleOrDefaultAsync(
+            department => department.Id == departmentId,
+            cancellationToken);
+
     public void AddExpenseRequest(ExpenseRequest expenseRequest) => ExpenseRequests.Add(expenseRequest);
-    public void UpdateExpenseRequest(ExpenseRequest expenseRequest) => ExpenseRequests.Update(expenseRequest);
+    public void UpdateExpenseRequest(ExpenseRequest expenseRequest, byte[] originalRowVersion)
+    {
+        ExpenseRequests.Update(expenseRequest);
+        Entry(expenseRequest).Property(request => request.RowVersion).OriginalValue = originalRowVersion;
+    }
     public void AddApprovalHistory(ApprovalHistory approvalHistory) => ApprovalHistories.Add(approvalHistory);
+
+    public override async Task<int> SaveChangesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new ConcurrencyConflictException(
+                "The expense request was modified by another operation.",
+                exception);
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

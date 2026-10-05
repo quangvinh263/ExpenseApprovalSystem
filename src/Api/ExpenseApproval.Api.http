@@ -17,7 +17,8 @@ POST http://localhost:5119/api/expenses/56e5435a-1cc3-4908-9e27-3c3e7606b4ac/sub
 Content-Type: application/json
 
 {
-  "userId": "22222222-2222-2222-2222-222222222222"
+  "userId": "22222222-2222-2222-2222-222222222222",
+  "rowVersion": ""
 }
 
 ### 3. Duyệt đơn (Approve)
@@ -26,7 +27,8 @@ Content-Type: application/json
 
 {
   "userId": "33333333-3333-3333-3333-333333333333",
-  "comment": "Đồng ý duyệt chi phí công tác"
+  "comment": "Đồng ý duyệt chi phí công tác",
+  "rowVersion": ""
 }
 
 ### 4. Từ chối đơn (Reject)
@@ -35,7 +37,8 @@ Content-Type: application/json
 
 {
   "userId": "33333333-3333-3333-3333-333333333333",
-  "comment": "Thiếu hóa đơn đính kèm, từ chối"
+  "comment": "Thiếu hóa đơn đính kèm, từ chối",
+  "rowVersion": ""
 }
 
 ### 5. Thanh toán đơn (Mark Paid) - Dùng ID của Accountant
@@ -43,5 +46,6 @@ POST http://localhost:5119/api/expenses/31861e07-49f1-4ef5-a98c-73220c55f333/pay
 Content-Type: application/json
 
 {
-  "userId": "55555555-5555-5555-5555-555555555555"
+  "userId": "55555555-5555-5555-5555-555555555555",
+  "rowVersion": ""
 }

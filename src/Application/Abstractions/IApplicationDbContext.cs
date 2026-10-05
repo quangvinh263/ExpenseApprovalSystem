@@ -12,8 +12,12 @@ public interface IApplicationDbContext
         Guid userId,
         CancellationToken cancellationToken = default);
 
+    Task<Department?> GetDepartmentAsync(
+        Guid departmentId,
+        CancellationToken cancellationToken = default);
+
     void AddExpenseRequest(ExpenseRequest expenseRequest);
-    void UpdateExpenseRequest(ExpenseRequest expenseRequest);
+    void UpdateExpenseRequest(ExpenseRequest expenseRequest, byte[] originalRowVersion);
     void AddApprovalHistory(ApprovalHistory approvalHistory);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

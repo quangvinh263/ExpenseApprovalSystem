@@ -50,10 +50,11 @@ public sealed class RejectExpenseCommandHandler(IApplicationDbContext dbContext)
         {
             Status = RejectedStatus,
             CurrentApproverRole = null,
-            UpdatedAt = now
+            UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
         };
 
-        dbContext.UpdateExpenseRequest(rejectedExpenseRequest);
+        dbContext.UpdateExpenseRequest(rejectedExpenseRequest, request.RowVersion);
         dbContext.AddApprovalHistory(new ApprovalHistory
         {
             Id = Guid.NewGuid(),
