@@ -13,11 +13,27 @@ Content-Type: application/json
 }
 
 ### 2. Gửi duyệt Đề nghị chi phí (Submit)
-POST http://localhost:5119/api/expenses/31861e07-49f1-4ef5-a98c-73220c55f333/submit
+POST http://localhost:5119/api/expenses/56e5435a-1cc3-4908-9e27-3c3e7606b4ac/submit
 Content-Type: application/json
 
 {
   "userId": "22222222-2222-2222-2222-222222222222"
 }
 
-###
+### 3. Duyệt đơn (Approve)
+POST http://localhost:5119/api/expenses/31861e07-49f1-4ef5-a98c-73220c55f333/approve
+Content-Type: application/json
+
+{
+  "userId": "33333333-3333-3333-3333-333333333333",
+  "comment": "Đồng ý duyệt chi phí công tác"
+}
+
+### 4. Từ chối đơn (Reject)
+POST http://localhost:5119/api/expenses/56e5435a-1cc3-4908-9e27-3c3e7606b4ac/reject
+Content-Type: application/json
+
+{
+  "userId": "33333333-3333-3333-3333-333333333333",
+  "comment": "Thiếu hóa đơn đính kèm, từ chối"
+}

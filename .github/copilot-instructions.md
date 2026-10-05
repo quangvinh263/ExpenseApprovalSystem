@@ -5,7 +5,7 @@ You are helping build an internal Expense Approval System using ASP.NET Core.
 Employees submit expense claims with receipts. The system supports multi-level approval workflow and later reimbursement by accounting.
 
 ## Tech Stack
-- ASP.NET Core 8 Web API
+- ASP.NET Core 9 Web API
 - Entity Framework Core
 - PostgreSQL
 - Clean Architecture

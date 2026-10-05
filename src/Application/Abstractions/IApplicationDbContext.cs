@@ -8,6 +8,10 @@ public interface IApplicationDbContext
         Guid expenseRequestId,
         CancellationToken cancellationToken = default);
 
+    Task<User?> GetUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
     void AddExpenseRequest(ExpenseRequest expenseRequest);
     void UpdateExpenseRequest(ExpenseRequest expenseRequest);
     void AddApprovalHistory(ApprovalHistory approvalHistory);
