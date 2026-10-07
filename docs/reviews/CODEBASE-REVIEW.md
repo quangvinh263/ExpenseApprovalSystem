@@ -22,24 +22,9 @@ sàng production. Các vấn đề ưu tiên cao nhất còn lại là credentia
 Không còn issue Critical mở trong phạm vi review này. C1 đã được xử lý bằng
 JWT authentication, authorization policies và actor identity lấy từ JWT claims.
 
-### C2. Credentials plaintext được seed trong startup
-
-**File:** [`src/Api/Program.cs`](../../src/Api/Program.cs)
-
-Startup đang seed:
-
-```csharp
-PasswordHash = "123"
-```
-
-Đây không phải password hash và có thể bị deploy ngoài ý muốn.
-
-**Khuyến nghị:**
-
-- Không seed credentials trong production startup.
-- Dùng password hasher thực sự.
-- Chỉ seed development bằng code/configuration riêng.
-- Không commit secret hoặc mật khẩu cố định.
+Không còn issue Critical mở trong phạm vi review này. C2 đã được xử lý bằng
+cách tách development seeding, không seed trong production, không commit mật
+khẩu mặc định và hash mật khẩu bằng `PasswordHasher<User>`.
 
 ### C3. Create cho phép dữ liệu identity do client kiểm soát
 
