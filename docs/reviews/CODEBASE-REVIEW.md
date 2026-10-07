@@ -26,30 +26,14 @@ Không còn issue Critical mở trong phạm vi review này. C2 đã được x�
 cách tách development seeding, không seed trong production, không commit mật
 khẩu mặc định và hash mật khẩu bằng `PasswordHasher<User>`.
 
-### C3. Create cho phép dữ liệu identity do client kiểm soát
-
-**File:** [`src/Application/Expenses/CreateExpenseCommandHandler.cs`](../../src/Application/Expenses/CreateExpenseCommandHandler.cs)
-
-Create chưa xác minh requester tồn tại, active, thuộc department được gửi lên
-hoặc department active. Caller có thể tạo expense cho user/department khác.
-
-**Khuyến nghị:**
-
-- Dùng authenticated identity từ JWT.
-- Kiểm tra requester và department consistency.
-- Validate amount, category, reason ở boundary.
-- Trả lỗi có chủ đích thay vì để foreign-key/database exception thành 500.
+Không còn issue Critical mở trong phạm vi review này. C3 đã được xử lý bằng
+authenticated requester từ JWT claims, kiểm tra requester/department và
+validation dữ liệu expense trước khi insert.
 
 ## Required Changes
 
-### R1. Draft không nên có `CurrentApproverRole`
-
-**File:** [`src/Application/Expenses/CreateExpenseCommandHandler.cs`](../../src/Application/Expenses/CreateExpenseCommandHandler.cs)
-
-Draft hiện được tạo với `CurrentApproverRole = "TeamLead"`. Theo workflow spec,
-role phải được tính tại thời điểm Submit.
-
-**Khuyến nghị:** Gán `CurrentApproverRole = null` khi tạo Draft.
+R1 đã được xử lý cùng với C3: Draft không còn gán sẵn
+`CurrentApproverRole`; role chỉ được tính khi Submit.
 
 ### R2. State machine chưa được mô hình hóa
 

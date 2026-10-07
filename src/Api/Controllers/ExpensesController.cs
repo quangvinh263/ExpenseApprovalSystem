@@ -32,11 +32,22 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
             request.Amount,
             request.Category,
             request.Reason);
-        var expenseRequestId = await sender.Send(command, cancellationToken);
+        try
+        {
+            var expenseRequestId = await sender.Send(command, cancellationToken);
 
-        return Created(
-            $"/api/expenses/{expenseRequestId}",
-            new ApiResponse<Guid>(expenseRequestId));
+            return Created(
+                $"/api/expenses/{expenseRequestId}",
+                new ApiResponse<Guid>(expenseRequestId));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { error = exception.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
     }
 
     [HttpPost("{id:guid}/submit")]
