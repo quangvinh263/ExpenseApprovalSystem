@@ -106,7 +106,8 @@ concurrency token và guard append-only của `ApprovalHistory`. API tests bao p
 
 ## Optional Improvements
 
-- Thêm endpoint xem approval history.
+- Đã thêm endpoint `GET /api/expenses/{id}/history`, trả về lịch sử audit theo
+  thứ tự thời gian tăng dần và yêu cầu policy `ExpenseCreator`.
 - Thêm idempotency/rate limiting cho command state-changing.
 - Thêm structured logging và correlation ID.
 

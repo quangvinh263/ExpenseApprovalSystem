@@ -16,6 +16,10 @@ public interface IApplicationDbContext
         Guid departmentId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ApprovalHistory>> GetApprovalHistoriesAsync(
+        Guid expenseRequestId,
+        CancellationToken cancellationToken = default);
+
     void AddExpenseRequest(ExpenseRequest expenseRequest);
     void UpdateExpenseRequest(ExpenseRequest expenseRequest, byte[] originalRowVersion);
     void AddApprovalHistory(ApprovalHistory approvalHistory);

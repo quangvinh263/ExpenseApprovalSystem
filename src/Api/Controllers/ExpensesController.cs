@@ -66,6 +66,47 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         DateTimeOffset UpdatedAt,
         string RowVersion);
 
+    [HttpGet("{id:guid}/history")]
+    [Authorize(Policy = "ExpenseCreator")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ApprovalHistoryResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetApprovalHistory(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var histories = await sender.Send(
+                new GetApprovalHistoryQuery(id),
+                cancellationToken);
+
+            return Ok(new ApiResponse<IReadOnlyList<ApprovalHistoryResponse>>(
+                histories
+                    .Select(history => new ApprovalHistoryResponse(
+                        history.Id,
+                        history.ActionByUserId,
+                        history.Action,
+                        history.FromStatus,
+                        history.ToStatus,
+                        history.Comment,
+                        history.CreatedAt))
+                    .ToList()));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    public sealed record ApprovalHistoryResponse(
+        Guid Id,
+        Guid ActionByUserId,
+        string Action,
+        string FromStatus,
+        string ToStatus,
+        string? Comment,
+        DateTimeOffset CreatedAt);
+
     [HttpPost]
     [Authorize(Policy = "ExpenseCreator")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]

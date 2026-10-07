@@ -32,6 +32,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             department => department.Id == departmentId,
             cancellationToken);
 
+    public async Task<IReadOnlyList<ApprovalHistory>> GetApprovalHistoriesAsync(
+        Guid expenseRequestId,
+        CancellationToken cancellationToken = default) =>
+        await ApprovalHistories.AsNoTracking()
+            .Where(history => history.ExpenseRequestId == expenseRequestId)
+            .OrderBy(history => history.CreatedAt)
+            .ThenBy(history => history.Id)
+            .ToListAsync(cancellationToken);
+
     public void AddExpenseRequest(ExpenseRequest expenseRequest) => ExpenseRequests.Add(expenseRequest);
     public void UpdateExpenseRequest(ExpenseRequest expenseRequest, byte[] originalRowVersion)
     {

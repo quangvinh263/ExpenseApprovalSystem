@@ -53,6 +53,41 @@ public sealed class AppDbContextTests
     }
 
     [Fact]
+    public async Task Approval_histories_are_returned_in_created_order()
+    {
+        await using var context = CreateContext();
+        var expenseRequestId = Guid.NewGuid();
+        var later = new ApprovalHistory
+        {
+            Id = Guid.NewGuid(),
+            ExpenseRequestId = expenseRequestId,
+            ActionByUserId = Guid.NewGuid(),
+            Action = "Approve",
+            FromStatus = "PendingApproval",
+            ToStatus = "Approved",
+            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(1)
+        };
+        var earlier = new ApprovalHistory
+        {
+            Id = Guid.NewGuid(),
+            ExpenseRequestId = expenseRequestId,
+            ActionByUserId = Guid.NewGuid(),
+            Action = "Submit",
+            FromStatus = "Draft",
+            ToStatus = "PendingApproval",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        context.AddApprovalHistory(later);
+        context.AddApprovalHistory(earlier);
+        await context.SaveChangesAsync();
+
+        var histories = await context.GetApprovalHistoriesAsync(expenseRequestId);
+
+        Assert.Equal([earlier.Id, later.Id], histories.Select(history => history.Id));
+    }
+
+    [Fact]
     public void Row_version_is_configured_as_required_concurrency_token()
     {
         using var context = CreateContext();

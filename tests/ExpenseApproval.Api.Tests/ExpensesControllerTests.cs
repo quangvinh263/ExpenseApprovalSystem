@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using ExpenseApproval.Api.Contracts;
 using ExpenseApproval.Api.Controllers;
 using ExpenseApproval.Application.Expenses;
+using ExpenseApproval.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -119,6 +121,63 @@ public sealed class ExpensesControllerTests
 
         var controller = CreateController(sender, Guid.NewGuid());
         var result = await controller.Get(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Equal(
+            StatusCodes.Status404NotFound,
+            Assert.IsType<NotFoundResult>(result).StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_approval_history_returns_ok_with_history_entries()
+    {
+        var sender = new Mock<ISender>();
+        var expenseId = Guid.NewGuid();
+        var historyId = Guid.NewGuid();
+        sender
+            .Setup(mock => mock.Send(
+                It.IsAny<GetApprovalHistoryQuery>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new ApprovalHistory
+                {
+                    Id = historyId,
+                    ExpenseRequestId = expenseId,
+                    ActionByUserId = Guid.NewGuid(),
+                    Action = "Submit",
+                    FromStatus = "Draft",
+                    ToStatus = "PendingApproval",
+                    CreatedAt = DateTimeOffset.UtcNow
+                }
+            ]);
+
+        var controller = CreateController(sender, Guid.NewGuid());
+        var result = await controller.GetApprovalHistory(
+            expenseId,
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ExpensesController.ApprovalHistoryResponse>>>(
+            ok.Value);
+        var history = Assert.Single(response.Data);
+        Assert.Equal(historyId, history.Id);
+        Assert.Equal("Submit", history.Action);
+    }
+
+    [Fact]
+    public async Task Get_approval_history_returns_not_found_when_expense_does_not_exist()
+    {
+        var sender = new Mock<ISender>();
+        sender
+            .Setup(mock => mock.Send(
+                It.IsAny<GetApprovalHistoryQuery>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new KeyNotFoundException());
+
+        var controller = CreateController(sender, Guid.NewGuid());
+        var result = await controller.GetApprovalHistory(
+            Guid.NewGuid(),
+            CancellationToken.None);
 
         Assert.Equal(
             StatusCodes.Status404NotFound,
