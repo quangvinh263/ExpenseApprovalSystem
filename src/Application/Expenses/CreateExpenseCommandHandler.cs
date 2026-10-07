@@ -1,5 +1,6 @@
 using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Domain.Entities;
+using ExpenseApproval.Domain.Workflow;
 using MediatR;
 
 namespace ExpenseApproval.Application.Expenses;
@@ -7,9 +8,6 @@ namespace ExpenseApproval.Application.Expenses;
 public sealed class CreateExpenseCommandHandler(IApplicationDbContext dbContext)
     : IRequestHandler<CreateExpenseCommand, Guid>
 {
-    private const string DraftStatus = "Draft";
-    private static readonly string[] ValidCategories =
-        ["Travel", "Meal", "Hotel", "Supplies", "Other"];
 
     public async Task<Guid> Handle(
         CreateExpenseCommand request,
@@ -47,7 +45,7 @@ public sealed class CreateExpenseCommandHandler(IApplicationDbContext dbContext)
                 nameof(request.Amount));
         }
 
-        if (!ValidCategories.Contains(request.Category, StringComparer.Ordinal))
+        if (!ExpenseWorkflow.Categories.Contains(request.Category))
         {
             throw new ArgumentException(
                 "Expense category is invalid.",
@@ -70,7 +68,7 @@ public sealed class CreateExpenseCommandHandler(IApplicationDbContext dbContext)
             Amount = request.Amount,
             Category = request.Category,
             Reason = request.Reason.Trim(),
-            Status = DraftStatus,
+            Status = ExpenseWorkflow.Draft,
             CurrentApproverRole = null,
             CreatedAt = now,
             UpdatedAt = now

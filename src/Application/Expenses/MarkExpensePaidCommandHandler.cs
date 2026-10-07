@@ -1,5 +1,6 @@
 using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Domain.Entities;
+using ExpenseApproval.Domain.Workflow;
 using MediatR;
 
 namespace ExpenseApproval.Application.Expenses;
@@ -7,10 +8,6 @@ namespace ExpenseApproval.Application.Expenses;
 public sealed class MarkExpensePaidCommandHandler(IApplicationDbContext dbContext)
     : IRequestHandler<MarkExpensePaidCommand, Guid>
 {
-    private const string ApprovedStatus = "Approved";
-    private const string PaidStatus = "Paid";
-    private const string MarkPaidAction = "MarkPaid";
-
     public async Task<Guid> Handle(
         MarkExpensePaidCommand request,
         CancellationToken cancellationToken)
@@ -27,7 +24,7 @@ public sealed class MarkExpensePaidCommandHandler(IApplicationDbContext dbContex
 
         if (!string.Equals(
                 expenseRequest.Status,
-                ApprovedStatus,
+                ExpenseWorkflow.Approved,
                 StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
@@ -46,13 +43,10 @@ public sealed class MarkExpensePaidCommandHandler(IApplicationDbContext dbContex
         }
 
         var now = DateTimeOffset.UtcNow;
-        var paidExpenseRequest = expenseRequest with
-        {
-            Status = PaidStatus,
-            CurrentApproverRole = null,
-            UpdatedAt = now,
-            RowVersion = Guid.NewGuid().ToByteArray()
-        };
+        var paidExpenseRequest = ExpenseWorkflow.MarkPaid(
+            expenseRequest,
+            now,
+            Guid.NewGuid().ToByteArray());
 
         dbContext.UpdateExpenseRequest(paidExpenseRequest, request.RowVersion);
         dbContext.AddApprovalHistory(new ApprovalHistory
@@ -60,9 +54,9 @@ public sealed class MarkExpensePaidCommandHandler(IApplicationDbContext dbContex
             Id = Guid.NewGuid(),
             ExpenseRequestId = paidExpenseRequest.Id,
             ActionByUserId = request.UserId,
-            Action = MarkPaidAction,
-            FromStatus = ApprovedStatus,
-            ToStatus = PaidStatus,
+            Action = ExpenseWorkflow.MarkPaidAction,
+            FromStatus = ExpenseWorkflow.Approved,
+            ToStatus = ExpenseWorkflow.Paid,
             CreatedAt = now
         });
 

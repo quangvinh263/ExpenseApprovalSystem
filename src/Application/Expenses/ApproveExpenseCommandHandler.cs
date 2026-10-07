@@ -1,5 +1,6 @@
 using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Domain.Entities;
+using ExpenseApproval.Domain.Workflow;
 using MediatR;
 
 namespace ExpenseApproval.Application.Expenses;
@@ -7,10 +8,6 @@ namespace ExpenseApproval.Application.Expenses;
 public sealed class ApproveExpenseCommandHandler(IApplicationDbContext dbContext)
     : IRequestHandler<ApproveExpenseCommand, Guid>
 {
-    private const string PendingApprovalStatus = "PendingApproval";
-    private const string ApprovedStatus = "Approved";
-    private const string ApproveAction = "Approve";
-
     public async Task<Guid> Handle(
         ApproveExpenseCommand request,
         CancellationToken cancellationToken)
@@ -27,7 +24,7 @@ public sealed class ApproveExpenseCommandHandler(IApplicationDbContext dbContext
 
         if (!string.Equals(
                 expenseRequest.Status,
-                PendingApprovalStatus,
+                ExpenseWorkflow.PendingApproval,
                 StringComparison.Ordinal) ||
             string.IsNullOrWhiteSpace(expenseRequest.CurrentApproverRole))
         {
@@ -36,16 +33,13 @@ public sealed class ApproveExpenseCommandHandler(IApplicationDbContext dbContext
         }
 
         var approver = await dbContext.GetUserAsync(request.ApproverId, cancellationToken);
-        ValidateApprover(expenseRequest, approver);
+        ApproverAuthorizationPolicy.EnsureCanAct(expenseRequest, approver);
 
         var now = DateTimeOffset.UtcNow;
-        var approvedExpenseRequest = expenseRequest with
-        {
-            Status = ApprovedStatus,
-            CurrentApproverRole = null,
-            UpdatedAt = now,
-            RowVersion = Guid.NewGuid().ToByteArray()
-        };
+        var approvedExpenseRequest = ExpenseWorkflow.Approve(
+            expenseRequest,
+            now,
+            Guid.NewGuid().ToByteArray());
 
         dbContext.UpdateExpenseRequest(approvedExpenseRequest, request.RowVersion);
         dbContext.AddApprovalHistory(new ApprovalHistory
@@ -53,9 +47,9 @@ public sealed class ApproveExpenseCommandHandler(IApplicationDbContext dbContext
             Id = Guid.NewGuid(),
             ExpenseRequestId = approvedExpenseRequest.Id,
             ActionByUserId = request.ApproverId,
-            Action = ApproveAction,
-            FromStatus = PendingApprovalStatus,
-            ToStatus = ApprovedStatus,
+            Action = ExpenseWorkflow.ApproveAction,
+            FromStatus = ExpenseWorkflow.PendingApproval,
+            ToStatus = ExpenseWorkflow.Approved,
             Comment = request.Comment,
             CreatedAt = now
         });
@@ -63,21 +57,5 @@ public sealed class ApproveExpenseCommandHandler(IApplicationDbContext dbContext
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return approvedExpenseRequest.Id;
-    }
-
-    private static void ValidateApprover(ExpenseRequest expenseRequest, User? approver)
-    {
-        if (approver is null ||
-            !approver.IsActive ||
-            !string.Equals(
-                approver.Role,
-                expenseRequest.CurrentApproverRole,
-                StringComparison.Ordinal) ||
-            approver.DepartmentId != expenseRequest.DepartmentId ||
-            approver.Id == expenseRequest.RequesterId)
-        {
-            throw new UnauthorizedAccessException(
-                "The user is not authorized to approve this expense request.");
-        }
     }
 }

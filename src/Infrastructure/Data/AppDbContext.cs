@@ -43,6 +43,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public override async Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {
+        var auditMutation = ChangeTracker.Entries<ApprovalHistory>()
+            .FirstOrDefault(entry =>
+                entry.State is EntityState.Modified or EntityState.Deleted);
+        if (auditMutation is not null)
+        {
+            throw new InvalidOperationException(
+                "Approval history is append-only and cannot be modified or deleted.");
+        }
+
         try
         {
             return await base.SaveChangesAsync(cancellationToken);

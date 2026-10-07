@@ -1,5 +1,6 @@
 using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Domain.Entities;
+using ExpenseApproval.Domain.Workflow;
 using MediatR;
 
 namespace ExpenseApproval.Application.Expenses;
@@ -7,9 +8,6 @@ namespace ExpenseApproval.Application.Expenses;
 public sealed class SubmitExpenseCommandHandler(IApplicationDbContext dbContext)
     : IRequestHandler<SubmitExpenseCommand, Guid>
 {
-    private const string DraftStatus = "Draft";
-    private const string PendingApprovalStatus = "PendingApproval";
-    private const string SubmitAction = "Submit";
     private const decimal TeamLeadApprovalLimit = 10_000_000m;
 
     public async Task<Guid> Handle(
@@ -26,7 +24,7 @@ public sealed class SubmitExpenseCommandHandler(IApplicationDbContext dbContext)
                 $"Expense request '{request.ExpenseRequestId}' was not found.");
         }
 
-        if (!string.Equals(expenseRequest.Status, DraftStatus, StringComparison.Ordinal))
+        if (!string.Equals(expenseRequest.Status, ExpenseWorkflow.Draft, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Expense request '{request.ExpenseRequestId}' is not in Draft status.");
@@ -68,17 +66,15 @@ public sealed class SubmitExpenseCommandHandler(IApplicationDbContext dbContext)
         }
 
         var currentApproverRole = expenseRequest.Amount <= TeamLeadApprovalLimit
-            ? "TeamLead"
-            : "Manager";
+            ? ExpenseWorkflow.TeamLead
+            : ExpenseWorkflow.Manager;
         var now = DateTimeOffset.UtcNow;
 
-        var submittedExpenseRequest = expenseRequest with
-        {
-            Status = PendingApprovalStatus,
-            CurrentApproverRole = currentApproverRole,
-            UpdatedAt = now,
-            RowVersion = Guid.NewGuid().ToByteArray()
-        };
+        var submittedExpenseRequest = ExpenseWorkflow.Submit(
+            expenseRequest,
+            currentApproverRole,
+            now,
+            Guid.NewGuid().ToByteArray());
 
         dbContext.UpdateExpenseRequest(submittedExpenseRequest, request.RowVersion);
         dbContext.AddApprovalHistory(new ApprovalHistory
@@ -86,9 +82,9 @@ public sealed class SubmitExpenseCommandHandler(IApplicationDbContext dbContext)
             Id = Guid.NewGuid(),
             ExpenseRequestId = submittedExpenseRequest.Id,
             ActionByUserId = request.UserId,
-            Action = SubmitAction,
-            FromStatus = DraftStatus,
-            ToStatus = PendingApprovalStatus,
+            Action = ExpenseWorkflow.SubmitAction,
+            FromStatus = ExpenseWorkflow.Draft,
+            ToStatus = ExpenseWorkflow.PendingApproval,
             CreatedAt = now
         });
 

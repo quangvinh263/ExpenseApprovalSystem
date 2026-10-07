@@ -60,6 +60,12 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+await using (var migrationScope = app.Services.CreateAsyncScope())
+{
+    var dbContext = migrationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
+
 if (app.Environment.IsDevelopment())
 {
     var seedPassword = builder.Configuration["DevelopmentSeed:Password"];
@@ -69,6 +75,30 @@ if (app.Environment.IsDevelopment())
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await DevelopmentDataSeeder.SeedAsync(dbContext, seedPassword);
     }
+
+    app.UseExceptionHandler(errorApp =>
+    {
+        errorApp.Run(async context =>
+        {
+            var exception = context.Features
+                .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?
+                .Error;
+
+            var (statusCode, title) = exception switch
+            {
+                ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request"),
+                UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
+                KeyNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
+                InvalidOperationException => (StatusCodes.Status409Conflict, "Conflict"),
+                _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
+            };
+
+            context.Response.StatusCode = statusCode;
+            await Results.Problem(
+                statusCode: statusCode,
+                title: title).ExecuteAsync(context);
+        });
+    });
 }
 
 // Configure the HTTP request pipeline.

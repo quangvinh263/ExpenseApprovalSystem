@@ -19,6 +19,53 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     public sealed record SubmitExpenseRequest(byte[] RowVersion);
     public sealed record ExpenseActionRequest(string? Comment, byte[] RowVersion);
 
+    [HttpGet("{id:guid}")]
+    [Authorize(Policy = "ExpenseCreator")]
+    [ProducesResponseType(typeof(ApiResponse<ExpenseDetailsResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Get(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var expense = await sender.Send(
+                new GetExpenseQuery(id),
+                cancellationToken);
+
+            return Ok(new ApiResponse<ExpenseDetailsResponse>(
+                new ExpenseDetailsResponse(
+                    expense.Id,
+                    expense.RequesterId,
+                    expense.DepartmentId,
+                    expense.Amount,
+                    expense.Category,
+                    expense.Reason,
+                    expense.Status,
+                    expense.CurrentApproverRole,
+                    expense.CreatedAt,
+                    expense.UpdatedAt,
+                    Convert.ToBase64String(expense.RowVersion))));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    public sealed record ExpenseDetailsResponse(
+        Guid Id,
+        Guid RequesterId,
+        Guid DepartmentId,
+        decimal Amount,
+        string Category,
+        string Reason,
+        string Status,
+        string? CurrentApproverRole,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt,
+        string RowVersion);
+
     [HttpPost]
     [Authorize(Policy = "ExpenseCreator")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]

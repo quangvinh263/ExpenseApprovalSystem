@@ -1,5 +1,6 @@
 using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Domain.Entities;
+using ExpenseApproval.Domain.Workflow;
 using MediatR;
 
 namespace ExpenseApproval.Application.Expenses;
@@ -7,10 +8,6 @@ namespace ExpenseApproval.Application.Expenses;
 public sealed class RejectExpenseCommandHandler(IApplicationDbContext dbContext)
     : IRequestHandler<RejectExpenseCommand, Guid>
 {
-    private const string PendingApprovalStatus = "PendingApproval";
-    private const string RejectedStatus = "Rejected";
-    private const string RejectAction = "Reject";
-
     public async Task<Guid> Handle(
         RejectExpenseCommand request,
         CancellationToken cancellationToken)
@@ -34,7 +31,7 @@ public sealed class RejectExpenseCommandHandler(IApplicationDbContext dbContext)
 
         if (!string.Equals(
                 expenseRequest.Status,
-                PendingApprovalStatus,
+                ExpenseWorkflow.PendingApproval,
                 StringComparison.Ordinal) ||
             string.IsNullOrWhiteSpace(expenseRequest.CurrentApproverRole))
         {
@@ -43,16 +40,13 @@ public sealed class RejectExpenseCommandHandler(IApplicationDbContext dbContext)
         }
 
         var approver = await dbContext.GetUserAsync(request.ApproverId, cancellationToken);
-        ValidateApprover(expenseRequest, approver);
+        ApproverAuthorizationPolicy.EnsureCanAct(expenseRequest, approver);
 
         var now = DateTimeOffset.UtcNow;
-        var rejectedExpenseRequest = expenseRequest with
-        {
-            Status = RejectedStatus,
-            CurrentApproverRole = null,
-            UpdatedAt = now,
-            RowVersion = Guid.NewGuid().ToByteArray()
-        };
+        var rejectedExpenseRequest = ExpenseWorkflow.Reject(
+            expenseRequest,
+            now,
+            Guid.NewGuid().ToByteArray());
 
         dbContext.UpdateExpenseRequest(rejectedExpenseRequest, request.RowVersion);
         dbContext.AddApprovalHistory(new ApprovalHistory
@@ -60,9 +54,9 @@ public sealed class RejectExpenseCommandHandler(IApplicationDbContext dbContext)
             Id = Guid.NewGuid(),
             ExpenseRequestId = rejectedExpenseRequest.Id,
             ActionByUserId = request.ApproverId,
-            Action = RejectAction,
-            FromStatus = PendingApprovalStatus,
-            ToStatus = RejectedStatus,
+            Action = ExpenseWorkflow.RejectAction,
+            FromStatus = ExpenseWorkflow.PendingApproval,
+            ToStatus = ExpenseWorkflow.Rejected,
             Comment = request.Comment.Trim(),
             CreatedAt = now
         });
@@ -70,21 +64,5 @@ public sealed class RejectExpenseCommandHandler(IApplicationDbContext dbContext)
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return rejectedExpenseRequest.Id;
-    }
-
-    private static void ValidateApprover(ExpenseRequest expenseRequest, User? approver)
-    {
-        if (approver is null ||
-            !approver.IsActive ||
-            !string.Equals(
-                approver.Role,
-                expenseRequest.CurrentApproverRole,
-                StringComparison.Ordinal) ||
-            approver.DepartmentId != expenseRequest.DepartmentId ||
-            approver.Id == expenseRequest.RequesterId)
-        {
-            throw new UnauthorizedAccessException(
-                "The user is not authorized to reject this expense request.");
-        }
     }
 }

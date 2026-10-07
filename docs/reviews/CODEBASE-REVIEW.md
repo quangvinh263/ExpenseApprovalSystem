@@ -2,212 +2,122 @@
 
 **Ngày review:** 2026-10-06  
 **Phạm vi:** Domain, Application, Infrastructure, API và workflow
-`Submit -> Approve/Reject -> MarkPaid`  
-**Tài liệu đối chiếu:**
-
-- [`docs/specs/SPEC-approval-workflow.md`](../specs/SPEC-approval-workflow.md)
-- [`.agents/rules/architecture.md`](../../.agents/rules/architecture.md)
-- [`.agents/context/database-schema.md`](../../.agents/context/database-schema.md)
+`Submit -> Approve/Reject -> MarkPaid`
 
 ## Review Summary
 
 **Verdict:** REQUEST CHANGES
 
-Codebase đã có skeleton Clean Architecture và workflow cơ bản, nhưng chưa sẵn
-sàng production. Các vấn đề ưu tiên cao nhất còn lại là credentials plaintext
-được seed trong startup, validation Create chưa đầy đủ và chưa có test tự động.
+Các vấn đề Critical C1-C3 và Required Changes R1-R9 đã được xử lý. R10 còn mở
+ở phần infrastructure/API automated tests.
 
 ## Critical Issues
 
-Không còn issue Critical mở trong phạm vi review này. C1 đã được xử lý bằng
-JWT authentication, authorization policies và actor identity lấy từ JWT claims.
+Không còn issue Critical mở:
 
-Không còn issue Critical mở trong phạm vi review này. C2 đã được xử lý bằng
-cách tách development seeding, không seed trong production, không commit mật
-khẩu mặc định và hash mật khẩu bằng `PasswordHasher<User>`.
-
-Không còn issue Critical mở trong phạm vi review này. C3 đã được xử lý bằng
-authenticated requester từ JWT claims, kiểm tra requester/department và
-validation dữ liệu expense trước khi insert.
+- **C1:** Actor identity lấy từ JWT claims; endpoint đã có authorization policies.
+- **C2:** Development seeding tách riêng, chỉ chạy trong Development, password
+  được lấy từ cấu hình ngoài source và hash bằng `PasswordHasher<User>`.
+- **C3:** Create kiểm tra requester/department, quyền sở hữu department và các
+  invariant của expense trước khi insert.
 
 ## Required Changes
 
-R1 đã được xử lý cùng với C3: Draft không còn gán sẵn
-`CurrentApproverRole`; role chỉ được tính khi Submit.
+### R1. Draft gán approver role sớm — ĐÃ HOÀN TẤT
 
-### R2. State machine chưa được mô hình hóa
+Draft không còn gán `CurrentApproverRole`; role chỉ được tính khi Submit.
 
-**File:** [`src/Application/Expenses/SubmitExpenseCommandHandler.cs`](../../src/Application/Expenses/SubmitExpenseCommandHandler.cs)
+### R2. State machine — ĐÃ HOÀN TẤT
 
-Handler chuyển trực tiếp `Draft -> PendingApproval`, trong khi spec xác định
-`Submitted` là checkpoint của state machine. Status cũng đang bị mutate trực
-tiếp bằng string trong handlers.
+[`ExpenseWorkflow`](../../src/Domain/Workflow/ExpenseWorkflow.cs) tập trung
+status, transition và guard. Submit mô hình hóa checkpoint
+`Draft -> Submitted -> PendingApproval`; các transition không hợp lệ bị chặn.
 
-**Khuyến nghị:**
+### R3. Hard-coded workflow values — ĐÃ HOÀN TẤT
 
-- Tạo domain transition API hoặc state machine.
-- Thực hiện và kiểm soát `Draft -> Submitted -> PendingApproval`.
-- Chặn các transition không hợp lệ như `Approved -> Rejected`, `Paid -> Approved`
-  và `Rejected -> Paid`.
+Status, role, action và category constants đã được tập trung trong
+[`ExpenseWorkflow`](../../src/Domain/Workflow/ExpenseWorkflow.cs), còn
+database mapping vẫn dùng string theo schema.
 
-### R3. Hard-coded status, role, action và category
+### R4. Create-time validation — ĐÃ HOÀN TẤT
 
-**Files:** `src/Application/Expenses/*.cs`
+[`CreateExpenseCommandHandler`](../../src/Application/Expenses/CreateExpenseCommandHandler.cs)
+kiểm tra requester/department active, department consistency, amount, category
+và reason trước khi insert. Validation hiện nằm ở Application layer; chưa thêm
+FluentValidation riêng vì không cần thiết cho phạm vi hiện tại.
 
-Các giá trị như `Draft`, `PendingApproval`, `TeamLead`, `Manager`, `Accountant`,
-`Admin`, `Submit`, `Approve`, `Reject`, `MarkPaid` và category đang rải rác
-trong handlers.
+### R5. RowVersion read/API contract — ĐÃ HOÀN TẤT
 
-**Khuyến nghị:** Tập trung thành domain constants, enum hoặc value objects;
-mapping database vẫn có thể giữ string.
+`GET /api/expenses/{id}` trả DTO có `RowVersion` dạng Base64 để client lấy
+version mới nhất trước state-changing commands.
 
-### R4. Create-time validation chưa đầy đủ
+### R6. Error mapping — ĐÃ HOÀN TẤT
 
-**File:** [`src/Application/Expenses/CreateExpenseCommandHandler.cs`](../../src/Application/Expenses/CreateExpenseCommandHandler.cs)
+Global exception handler trong `Program.cs` chuẩn hóa `400`, `403`, `404`,
+`409` và `500`. Một số try/catch cục bộ còn tồn tại nhưng không làm mất
+mapping tập trung.
 
-Chưa kiểm tra đầy đủ:
+### R7. Append-only ApprovalHistory — ĐÃ HOÀN TẤT
 
-- Requester tồn tại và active.
-- Department tồn tại và active.
-- Requester thuộc department.
-- Amount > 0.
-- Amount phù hợp precision.
-- Category hợp lệ.
-- Reason không rỗng.
+`AppDbContext.SaveChangesAsync` từ chối entry `Modified` hoặc `Deleted` của
+`ApprovalHistory`. Database trigger/permission là hardening tùy chọn.
 
-**Khuyến nghị:** Thêm FluentValidation validator và application-level
-validation cho các invariant quan trọng.
+### R8. Migration và async I/O — ĐÃ HOÀN TẤT
 
-### R5. RowVersion chưa có read/API contract hoàn chỉnh
+Startup dùng `MigrateAsync`; development seed được tách riêng, chỉ chạy khi
+Development và có `DevelopmentSeed:Password`. Seeder dùng async query/write.
 
-**File:** [`src/Api/Controllers/ExpensesController.cs`](../../src/Api/Controllers/ExpensesController.cs)
+### R9. Logic workflow bị lặp — ĐÃ HOÀN TẤT
 
-Các response hiện chỉ trả ID. Không có GET endpoint hoặc response DTO chứa
-`RowVersion`, nên client thực tế không có cách lấy version mới nhất để gửi cho
-Approve/Reject/Pay.
+Transition status đã được tập trung trong Domain workflow. Validation approver
+giữa Approve và Reject đã được tách thành
+[`ApproverAuthorizationPolicy`](../../src/Application/Expenses/ApproverAuthorizationPolicy.cs)
+dùng chung; handlers chỉ thực hiện orchestration và persistence.
 
-**Khuyến nghị:**
+### R10. Automated tests — ĐANG MỞ, ĐÃ CẢI THIỆN
 
-- Thêm `GET /api/expenses/{id}` trả DTO có `RowVersion` dạng Base64.
-- Hoặc trả representation đầy đủ sau mỗi state transition.
-- Không dùng raw `byte[]` không có quy ước encoding ở public API.
+Đã thêm project
+[`ExpenseApproval.Application.Tests`](../../tests/ExpenseApproval.Application.Tests/)
+và 5 unit tests cho transition cùng boundary amount. `dotnet test` đã pass.
 
-### R6. Error mapping chưa nhất quán
+Chưa có infrastructure/API tests cho:
 
-**File:** [`src/Api/Controllers/ExpensesController.cs`](../../src/Api/Controllers/ExpensesController.cs)
-
-Controller lặp nhiều khối `try/catch`; Create chưa có mapping lỗi expected,
-nên validation hoặc persistence exception có thể thành 500.
-
-**Khuyến nghị:** Dùng global exception handler để chuẩn hóa:
-
-- `400 Bad Request`
-- `403 Forbidden`
-- `404 Not Found`
-- `409 Conflict`
-- `500 Internal Server Error`
-
-### R7. Append-only audit chưa được enforce
-
-**File:** [`src/Infrastructure/Data/AppDbContext.cs`](../../src/Infrastructure/Data/AppDbContext.cs)
-
-`ApprovalHistory` có public `DbSet` và chưa có guard ngăn update/delete.
-
-**Khuyến nghị:**
-
-- Reject entry `Modified` hoặc `Deleted` của `ApprovalHistory` trong
-  persistence layer.
-- Cân nhắc database permissions/triggers nếu cần bảo vệ mạnh hơn.
-
-### R8. Startup dùng `EnsureCreated()` và synchronous I/O
-
-**File:** [`src/Api/Program.cs`](../../src/Api/Program.cs)
-
-Repository đã có migration nhưng startup dùng `EnsureCreated()`, `Any()` và
-`SaveChanges()`. Điều này không phù hợp cho schema evolution và vi phạm quy tắc
-I/O async.
-
-**Khuyến nghị:**
-
-- Dùng migration trong deployment process hoặc `MigrateAsync`.
-- Dùng `AnyAsync` và `SaveChangesAsync`.
-- Tách development seed khỏi production startup.
-
-### R9. Logic workflow bị lặp
-
-**Files:**
-
-- [`src/Application/Expenses/ApproveExpenseCommandHandler.cs`](../../src/Application/Expenses/ApproveExpenseCommandHandler.cs)
-- [`src/Application/Expenses/RejectExpenseCommandHandler.cs`](../../src/Application/Expenses/RejectExpenseCommandHandler.cs)
-- [`src/Application/Expenses/MarkExpensePaidCommandHandler.cs`](../../src/Application/Expenses/MarkExpensePaidCommandHandler.cs)
-
-Approve/Reject lặp validation approver và mỗi handler tự mutate status.
-
-**Khuyến nghị:** Tạo domain workflow/state-transition service và policy dùng
-chung; handler chỉ orchestration.
-
-### R10. Chưa có automated tests
-
-Không tìm thấy test project hoặc test file.
-
-**Khuyến nghị:** Thêm unit, infrastructure và API tests cho:
-
-- Transition hợp lệ và không hợp lệ.
-- Boundary `10.000.000` và `10.000.000,01`.
-- Sai role, khác department, tự approve.
-- Reject thiếu comment.
+- Sai role, khác department, tự approve và reject thiếu comment.
 - Mark Paid bởi role không hợp lệ.
-- RowVersion conflict.
-- Audit history.
-- Transaction rollback.
+- RowVersion conflict, audit history và transaction rollback.
 - HTTP status `400/403/404/409`.
-
-## Optional Improvements
-
-- Thêm endpoint xem chi tiết expense và approval history.
-- Thêm idempotency/rate limiting cho command state-changing.
-- Thêm structured logging và correlation ID cho workflow/concurrency conflict.
-- Tạo deployment pipeline áp dụng migrations thay vì API tự thay đổi schema.
-
-## Nits
-
-- Nên gom các DTO request của controller vào thư mục Contracts riêng thay vì
-  nested record nếu số lượng endpoint tiếp tục tăng.
-- Nên thống nhất tên `MarkPaid`/`MarkExpensePaid` trong API/Application để giảm
-  khác biệt ngữ nghĩa.
-- Nên trả error body theo một schema thống nhất thay vì anonymous object chỉ ở
-  một số endpoint.
-
-## What's Done Well
-
-- Controller không gọi trực tiếp `AppDbContext`.
-- MediatR được đăng ký và command/handler nằm ở Application.
-- Các action Submit/Approve/Reject/MarkPaid đều tạo `ApprovalHistory`.
-- Các handler dùng `CancellationToken`.
-- Entity được query bằng `AsNoTracking()` trước khi clone record.
-- Đã có optimistic concurrency với `RowVersion`.
-- Sai trạng thái được ánh xạ thành `409`.
-- Mark Paid dùng `StatusCode(403)` theo yêu cầu.
-- Hướng phụ thuộc Domain -> Application -> Infrastructure được giữ đúng.
 
 ## Verification Story
 
 - **Build:** Đạt — solution build thành công với 0 warning và 0 error.
-- **Tests:** Chưa đạt — chưa có test project/test file.
-- **Security:** Chưa đạt — thiếu JWT/authorization, actor ID do client kiểm
-  soát, credentials plaintext được seed.
-- **Architecture:** Đạt một phần — boundary cơ bản đúng, nhưng state machine và
-  policy chưa được tập trung ở Domain/Application.
-- **Performance:** Chưa có N+1 rõ ràng vì chưa có list endpoint; startup vẫn
-  dùng synchronous database I/O.
+- **Tests:** Đạt một phần — 5 unit tests workflow pass; infrastructure/API
+  coverage còn thiếu.
+- **Security:** Đạt ở mức workflow hiện tại — JWT, policies, actor claims và
+  development-only hashed seed đã được áp dụng.
+- **Architecture:** Đạt — state machine ở Domain và approver policy dùng chung
+  ở Application.
+- **Performance:** Đạt ở mức hiện tại — workflow dùng async và `AsNoTracking`,
+  chưa có list endpoint tạo N+1.
 
-## Suggested Prioritized Roadmap
+## Open Follow-up
 
-1. Loại bỏ plaintext credentials và tách development seed.
-2. Sửa Create validation và để Draft có `CurrentApproverRole = null`.
-3. Hoàn thiện state machine/domain transition rules.
-4. Hoàn thiện RowVersion read contract.
-5. Thêm global exception handling.
-6. Enforce append-only ApprovalHistory.
-7. Thêm automated tests cho Domain/Application/Infrastructure/API.
-8. Chuyển startup sang migrations và async database I/O.
+1. Bổ sung infrastructure và API automated tests.
+2. Cân nhắc chuyển migration execution sang deployment pipeline production.
+
+## Optional Improvements
+
+- Thêm endpoint xem approval history.
+- Thêm idempotency/rate limiting cho command state-changing.
+- Thêm structured logging và correlation ID.
+
+## What's Done Well
+
+- Controller không gọi trực tiếp `AppDbContext`.
+- MediatR command/handler nằm ở Application.
+- Submit/Approve/Reject/MarkPaid đều tạo `ApprovalHistory`.
+- Handler dùng `CancellationToken`.
+- Query dùng `AsNoTracking()` trước khi clone record.
+- Có optimistic concurrency với `RowVersion`.
+- Sai trạng thái ánh xạ thành `409`.
+- Mark Paid dùng `StatusCode(403)`.
+- Hướng phụ thuộc Domain -> Application -> Infrastructure được giữ đúng.

@@ -15,8 +15,6 @@ public static class DevelopmentDataSeeder
         string password,
         CancellationToken cancellationToken = default)
     {
-        await dbContext.Database.EnsureCreatedAsync(cancellationToken);
-
         if (!await dbContext.Departments.AnyAsync(
                 department => department.Id == DepartmentId,
                 cancellationToken))
