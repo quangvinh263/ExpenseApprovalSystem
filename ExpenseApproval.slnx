@@ -16,4 +16,7 @@
   <Folder Name="/tests/ExpenseApproval.Application.Tests/">
     <Project Path="tests/ExpenseApproval.Application.Tests/ExpenseApproval.Application.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/ExpenseApproval.Api.Tests/">
+    <Project Path="tests/ExpenseApproval.Api.Tests/ExpenseApproval.Api.Tests.csproj" />
+  </Folder>
 </Solution>

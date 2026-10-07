@@ -10,7 +10,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.20" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.20" />
+    <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -19,9 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Application\ExpenseApproval.Application.csproj" />
-    <ProjectReference Include="..\..\src\Domain\ExpenseApproval.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Infrastructure\ExpenseApproval.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Api\ExpenseApproval.Api.csproj" />
   </ItemGroup>
 
 </Project>

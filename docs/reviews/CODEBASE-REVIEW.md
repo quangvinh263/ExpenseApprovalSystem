@@ -8,8 +8,8 @@
 
 **Verdict:** REQUEST CHANGES
 
-Các vấn đề Critical C1-C3 và Required Changes R1-R9 đã được xử lý. R10 còn mở
-ở phần infrastructure/API automated tests.
+Các vấn đề Critical C1-C3 và Required Changes R1-R10 đã được xử lý trong phạm
+vi test hiện tại.
 
 ## Critical Issues
 
@@ -74,24 +74,25 @@ giữa Approve và Reject đã được tách thành
 [`ApproverAuthorizationPolicy`](../../src/Application/Expenses/ApproverAuthorizationPolicy.cs)
 dùng chung; handlers chỉ thực hiện orchestration và persistence.
 
-### R10. Automated tests — ĐANG MỞ, ĐÃ CẢI THIỆN
+### R10. Automated tests — ĐÃ HOÀN TẤT
 
-Đã thêm project
-[`ExpenseApproval.Application.Tests`](../../tests/ExpenseApproval.Application.Tests/)
-và 5 unit tests cho transition cùng boundary amount. `dotnet test` đã pass.
+Đã bổ sung:
 
-Chưa có infrastructure/API tests cho:
+- [`ExpenseApproval.Application.Tests`](../../tests/ExpenseApproval.Application.Tests/)
+  với domain workflow và infrastructure `AppDbContext` tests.
+- [`ExpenseApproval.Api.Tests`](../../tests/ExpenseApproval.Api.Tests/)
+  với controller/API contract tests.
 
-- Sai role, khác department, tự approve và reject thiếu comment.
-- Mark Paid bởi role không hợp lệ.
-- RowVersion conflict, audit history và transaction rollback.
-- HTTP status `400/403/404/409`.
+Infrastructure tests bao phủ truy vấn không tracking, cấu hình `RowVersion`
+concurrency token và guard append-only của `ApprovalHistory`. API tests bao phủ
+`201 Created`, `400 Bad Request`, `403 Forbidden`, `404 Not Found`,
+`409 Conflict` và xác nhận `RequesterId` lấy từ JWT claim.
 
 ## Verification Story
 
 - **Build:** Đạt — solution build thành công với 0 warning và 0 error.
-- **Tests:** Đạt một phần — 5 unit tests workflow pass; infrastructure/API
-  coverage còn thiếu.
+- **Tests:** Đạt — 13 tests pass, gồm domain, infrastructure và API controller
+  tests.
 - **Security:** Đạt ở mức workflow hiện tại — JWT, policies, actor claims và
   development-only hashed seed đã được áp dụng.
 - **Architecture:** Đạt — state machine ở Domain và approver policy dùng chung
@@ -101,8 +102,7 @@ Chưa có infrastructure/API tests cho:
 
 ## Open Follow-up
 
-1. Bổ sung infrastructure và API automated tests.
-2. Cân nhắc chuyển migration execution sang deployment pipeline production.
+1. Cân nhắc chuyển migration execution sang deployment pipeline production.
 
 ## Optional Improvements
 
