@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Application.Expenses;
@@ -5,6 +7,43 @@ using ExpenseApproval.Infrastructure.Data;
 using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    throw new InvalidOperationException("Jwt:Key must be configured.");
+}
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes(jwtKey)),
+            ValidateLifetime = true,
+            RoleClaimType = System.Security.Claims.ClaimTypes.Role,
+            NameClaimType = System.Security.Claims.ClaimTypes.NameIdentifier
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("ExpenseCreator", policy =>
+        policy.RequireAuthenticatedUser()
+            .RequireRole("Employee", "TeamLead", "Manager", "Accountant", "Admin"));
+    options.AddPolicy("ExpenseApprover", policy =>
+        policy.RequireAuthenticatedUser()
+            .RequireRole("TeamLead", "Manager"));
+    options.AddPolicy("ExpensePayer", policy =>
+        policy.RequireAuthenticatedUser()
+            .RequireRole("Accountant", "Admin"));
+});
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -73,5 +112,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.Run();

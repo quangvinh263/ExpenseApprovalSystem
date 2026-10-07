@@ -1,7 +1,9 @@
 using ExpenseApproval.Api.Contracts;
+using ExpenseApproval.Api.Auth;
 using ExpenseApproval.Application.Expenses;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ExpenseApproval.Api.Controllers;
 
@@ -9,15 +11,27 @@ namespace ExpenseApproval.Api.Controllers;
 [Route("api/expenses")]
 public sealed class ExpensesController(ISender sender) : ControllerBase
 {
-    public sealed record SubmitExpenseRequest(Guid UserId, byte[] RowVersion);
-    public sealed record ExpenseActionRequest(Guid UserId, string? Comment, byte[] RowVersion);
+    public sealed record CreateExpenseRequest(
+        Guid DepartmentId,
+        decimal Amount,
+        string Category,
+        string Reason);
+    public sealed record SubmitExpenseRequest(byte[] RowVersion);
+    public sealed record ExpenseActionRequest(string? Comment, byte[] RowVersion);
 
     [HttpPost]
+    [Authorize(Policy = "ExpenseCreator")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     public async Task<IActionResult> Create(
-        [FromBody] CreateExpenseCommand command,
+        [FromBody] CreateExpenseRequest request,
         CancellationToken cancellationToken)
     {
+        var command = new CreateExpenseCommand(
+            User.GetRequiredUserId(),
+            request.DepartmentId,
+            request.Amount,
+            request.Category,
+            request.Reason);
         var expenseRequestId = await sender.Send(command, cancellationToken);
 
         return Created(
@@ -26,6 +40,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/submit")]
+    [Authorize(Policy = "ExpenseCreator")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -37,7 +52,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         try
         {
             var expenseRequestId = await sender.Send(
-                new SubmitExpenseCommand(id, request.UserId, request.RowVersion),
+                new SubmitExpenseCommand(id, User.GetRequiredUserId(), request.RowVersion),
                 cancellationToken);
 
             return Ok(new ApiResponse<Guid>(expenseRequestId));
@@ -61,6 +76,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/approve")]
+    [Authorize(Policy = "ExpenseApprover")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -73,7 +89,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         try
         {
             var expenseRequestId = await sender.Send(
-                new ApproveExpenseCommand(id, request.UserId, request.Comment, request.RowVersion),
+                new ApproveExpenseCommand(id, User.GetRequiredUserId(), request.Comment, request.RowVersion),
                 cancellationToken);
 
             return Ok(new ApiResponse<Guid>(expenseRequestId));
@@ -93,6 +109,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/pay")]
+    [Authorize(Policy = "ExpensePayer")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -105,7 +122,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         try
         {
             var expenseRequestId = await sender.Send(
-                new MarkExpensePaidCommand(id, request.UserId, request.RowVersion),
+                new MarkExpensePaidCommand(id, User.GetRequiredUserId(), request.RowVersion),
                 cancellationToken);
 
             return Ok(new ApiResponse<Guid>(expenseRequestId));
@@ -125,6 +142,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/reject")]
+    [Authorize(Policy = "ExpenseApprover")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -138,7 +156,7 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         try
         {
             var expenseRequestId = await sender.Send(
-                new RejectExpenseCommand(id, request.UserId, request.Comment, request.RowVersion),
+                new RejectExpenseCommand(id, User.GetRequiredUserId(), request.Comment, request.RowVersion),
                 cancellationToken);
 
             return Ok(new ApiResponse<Guid>(expenseRequestId));
