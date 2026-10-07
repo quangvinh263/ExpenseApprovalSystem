@@ -16,6 +16,8 @@ vi test hiện tại.
 Không còn issue Critical mở:
 
 - **C1:** Actor identity lấy từ JWT claims; endpoint đã có authorization policies.
+  Authentication end-to-end đã có `POST /api/auth/register` và
+  `POST /api/auth/login` để phát hành access token.
 - **C2:** Development seeding tách riêng, chỉ chạy trong Development, password
   được lấy từ cấu hình ngoài source và hash bằng `PasswordHasher<User>`.
 - **C3:** Create kiểm tra requester/department, quyền sở hữu department và các

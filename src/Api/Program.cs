@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using ExpenseApproval.Application.Abstractions;
+using ExpenseApproval.Api.Auth;
 using ExpenseApproval.Application.Expenses;
 using ExpenseApproval.Api.Development;
 using ExpenseApproval.Infrastructure.Data;
@@ -50,6 +52,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IApplicationDbContext>(serviceProvider =>
     serviceProvider.GetRequiredService<AppDbContext>());
+builder.Services.AddSingleton<IPasswordHasher<ExpenseApproval.Domain.Entities.User>,
+    PasswordHasher<ExpenseApproval.Domain.Entities.User>>();
+builder.Services.AddScoped<IPasswordService, PasswordService>();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddMediatR(configuration =>
     configuration.RegisterServicesFromAssembly(typeof(CreateExpenseCommand).Assembly));
 builder.Services.AddControllers();

@@ -12,6 +12,10 @@ public interface IApplicationDbContext
         Guid userId,
         CancellationToken cancellationToken = default);
 
+    Task<User?> GetUserByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default);
+
     Task<Department?> GetDepartmentAsync(
         Guid departmentId,
         CancellationToken cancellationToken = default);
@@ -21,6 +25,7 @@ public interface IApplicationDbContext
         CancellationToken cancellationToken = default);
 
     void AddExpenseRequest(ExpenseRequest expenseRequest);
+    void AddUser(User user);
     void UpdateExpenseRequest(ExpenseRequest expenseRequest, byte[] originalRowVersion);
     void AddApprovalHistory(ApprovalHistory approvalHistory);
 

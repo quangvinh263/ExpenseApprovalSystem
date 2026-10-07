@@ -25,6 +25,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             user => user.Id == userId,
             cancellationToken);
 
+    public async Task<User?> GetUserByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default) =>
+        await Users.AsNoTracking().SingleOrDefaultAsync(
+            user => user.Email == email,
+            cancellationToken);
+
     public async Task<Department?> GetDepartmentAsync(
         Guid departmentId,
         CancellationToken cancellationToken = default) =>
@@ -42,6 +49,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .ToListAsync(cancellationToken);
 
     public void AddExpenseRequest(ExpenseRequest expenseRequest) => ExpenseRequests.Add(expenseRequest);
+    public void AddUser(User user) => Users.Add(user);
     public void UpdateExpenseRequest(ExpenseRequest expenseRequest, byte[] originalRowVersion)
     {
         ExpenseRequests.Update(expenseRequest);
