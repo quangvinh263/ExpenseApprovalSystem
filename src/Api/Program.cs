@@ -7,6 +7,7 @@ using ExpenseApproval.Api.Auth;
 using ExpenseApproval.Application.Expenses;
 using ExpenseApproval.Api.Development;
 using ExpenseApproval.Infrastructure.Data;
+using ExpenseApproval.Infrastructure.Storage;
 using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,6 +57,7 @@ builder.Services.AddSingleton<IPasswordHasher<ExpenseApproval.Domain.Entities.Us
     PasswordHasher<ExpenseApproval.Domain.Entities.User>>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddMediatR(configuration =>
     configuration.RegisterServicesFromAssembly(typeof(CreateExpenseCommand).Assembly));
 builder.Services.AddControllers();
@@ -116,6 +118,7 @@ if (app.Environment.IsDevelopment())
 
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Xunit;
+using System.Text;
 
 namespace ExpenseApproval.Api.Tests;
 
@@ -182,6 +183,63 @@ public sealed class ExpensesControllerTests
         Assert.Equal(
             StatusCodes.Status404NotFound,
             Assert.IsType<NotFoundResult>(result).StatusCode);
+    }
+
+    [Fact]
+    public async Task Upload_receipt_returns_url()
+    {
+        var sender = new Mock<ISender>();
+        var expenseId = Guid.NewGuid();
+        sender
+            .Setup(mock => mock.Send(
+                It.IsAny<UploadReceiptCommand>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("/uploads/receipts/receipt.pdf");
+
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("receipt"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "receipt.pdf")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/pdf"
+        };
+
+        var controller = CreateController(sender, Guid.NewGuid());
+        var result = await controller.UploadReceipt(
+            expenseId,
+            file,
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ApiResponse<string>>(ok.Value);
+        Assert.Equal("/uploads/receipts/receipt.pdf", response.Data);
+    }
+
+    [Fact]
+    public async Task Upload_receipt_returns_bad_request_for_invalid_file()
+    {
+        var sender = new Mock<ISender>();
+        sender
+            .Setup(mock => mock.Send(
+                It.IsAny<UploadReceiptCommand>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ArgumentException("Receipt file must be a JPEG, PNG, or PDF."));
+
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("receipt"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "receipt.exe")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/octet-stream"
+        };
+
+        var controller = CreateController(sender, Guid.NewGuid());
+        var result = await controller.UploadReceipt(
+            Guid.NewGuid(),
+            file,
+            CancellationToken.None);
+
+        Assert.Equal(
+            StatusCodes.Status400BadRequest,
+            Assert.IsType<BadRequestObjectResult>(result).StatusCode);
     }
 
     private static ExpensesController CreateController(

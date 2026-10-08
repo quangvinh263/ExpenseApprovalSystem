@@ -19,6 +19,39 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     public sealed record SubmitExpenseRequest(byte[] RowVersion);
     public sealed record ExpenseActionRequest(string? Comment, byte[] RowVersion);
 
+    [HttpPost("{id:guid}/receipt")]
+    [Authorize(Policy = "ExpenseCreator")]
+    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UploadReceipt(
+        Guid id,
+        [FromForm] IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var receiptUrl = await sender.Send(
+                new UploadReceiptCommand(id, file),
+                cancellationToken);
+
+            return Ok(new ApiResponse<string>(receiptUrl));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { error = exception.Message });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            return Conflict();
+        }
+    }
+
     [HttpGet("{id:guid}")]
     [Authorize(Policy = "ExpenseCreator")]
     [ProducesResponseType(typeof(ApiResponse<ExpenseDetailsResponse>), StatusCodes.Status200OK)]
