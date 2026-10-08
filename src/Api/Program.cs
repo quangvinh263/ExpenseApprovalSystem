@@ -8,6 +8,7 @@ using ExpenseApproval.Application.Expenses;
 using ExpenseApproval.Api.Development;
 using ExpenseApproval.Infrastructure.Data;
 using ExpenseApproval.Infrastructure.Storage;
+using Scalar.AspNetCore;
 using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -113,6 +114,7 @@ if (app.Environment.IsDevelopment())
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 
