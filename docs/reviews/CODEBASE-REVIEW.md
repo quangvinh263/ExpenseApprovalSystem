@@ -102,6 +102,29 @@ concurrency token và guard append-only của `ApprovalHistory`. API tests bao p
 - **Performance:** Đạt ở mức hiện tại — workflow dùng async và `AsNoTracking`,
   chưa có list endpoint tạo N+1.
 
+## Receipt Upload Security Review
+
+Các issue của feature Receipt Upload đã được xử lý:
+
+- IDOR: Application kiểm tra actor active, requester hoặc elevated user cùng
+  department trước upload/download.
+- Receipt không còn được public qua `UseStaticFiles()`; download đi qua endpoint
+  có authorization.
+- File mới được cleanup nếu persistence thất bại; storage cũng cleanup partial
+  file khi copy bị lỗi.
+- `IFormFile` chỉ tồn tại ở API boundary; Application nhận `Stream` và metadata.
+- Validation kiểm tra declared content type, magic bytes và giới hạn 5 MB.
+- Multipart request có server-level limit khoảng 6 MB để chứa multipart overhead.
+- Đã bổ sung application, infrastructure và API tests cho authorization,
+  signature, boundary size, workflow status, cleanup và private download.
+
+Giữ nguyên có chủ ý:
+
+- Không thêm client-provided `RowVersion`/`If-Match`; handler vẫn dùng
+  optimistic concurrency version đọc từ DB theo contract hiện tại.
+- Object storage, antivirus, retention và production cleanup policy nằm ngoài
+  phạm vi task này.
+
 ## Open Follow-up
 
 1. Cân nhắc chuyển migration execution sang deployment pipeline production.

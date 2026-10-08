@@ -11,6 +11,8 @@ namespace ExpenseApproval.Api.Controllers;
 [Route("api/expenses")]
 public sealed class ExpensesController(ISender sender) : ControllerBase
 {
+    private const long MaxReceiptRequestSize = 6 * 1024 * 1024;
+
     public sealed record CreateExpenseRequest(
         Guid DepartmentId,
         decimal Amount,
@@ -25,15 +27,29 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [RequestSizeLimit(MaxReceiptRequestSize)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxReceiptRequestSize)]
     public async Task<IActionResult> UploadReceipt(
         Guid id,
-        [FromForm] IFormFile file,
+        [FromForm(Name = "file")] IFormFile? file,
         CancellationToken cancellationToken)
     {
         try
         {
+            if (file is null)
+            {
+                return BadRequest(new { error = "Receipt file is required." });
+            }
+
+            await using var stream = file.OpenReadStream();
             var receiptUrl = await sender.Send(
-                new UploadReceiptCommand(id, file),
+                new UploadReceiptCommand(
+                    id,
+                    User.GetRequiredUserId(),
+                    stream,
+                    file.FileName,
+                    file.ContentType,
+                    file.Length),
                 cancellationToken);
 
             return Ok(new ApiResponse<string>(receiptUrl));
@@ -46,9 +62,44 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         {
             return NotFound();
         }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
         catch (InvalidOperationException)
         {
             return Conflict();
+        }
+    }
+
+    [HttpGet("{id:guid}/receipt")]
+    [Authorize(Policy = "ExpenseCreator")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadReceipt(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var receipt = await sender.Send(
+                new DownloadReceiptQuery(id, User.GetRequiredUserId()),
+                cancellationToken);
+
+            return File(
+                receipt.Content,
+                receipt.ContentType,
+                receipt.FileName,
+                enableRangeProcessing: true);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
         }
     }
 

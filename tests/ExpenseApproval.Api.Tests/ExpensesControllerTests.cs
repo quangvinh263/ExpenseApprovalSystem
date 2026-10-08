@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ExpenseApproval.Api.Contracts;
 using ExpenseApproval.Api.Controllers;
+using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Application.Expenses;
 using ExpenseApproval.Domain.Entities;
 using MediatR;
@@ -240,6 +241,47 @@ public sealed class ExpensesControllerTests
         Assert.Equal(
             StatusCodes.Status400BadRequest,
             Assert.IsType<BadRequestObjectResult>(result).StatusCode);
+    }
+
+    [Fact]
+    public async Task Download_receipt_returns_file_result()
+    {
+        var sender = new Mock<ISender>();
+        var stream = new MemoryStream([0x25, 0x50, 0x44, 0x46, 0x2D]);
+        sender
+            .Setup(mock => mock.Send(
+                It.IsAny<DownloadReceiptQuery>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoredFile(stream, "application/pdf", "receipt.pdf"));
+
+        var controller = CreateController(sender, Guid.NewGuid());
+        var result = await controller.DownloadReceipt(
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        var file = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("application/pdf", file.ContentType);
+        Assert.Equal("receipt.pdf", file.FileDownloadName);
+    }
+
+    [Fact]
+    public async Task Download_receipt_returns_forbidden_for_unauthorized_actor()
+    {
+        var sender = new Mock<ISender>();
+        sender
+            .Setup(mock => mock.Send(
+                It.IsAny<DownloadReceiptQuery>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UnauthorizedAccessException());
+
+        var controller = CreateController(sender, Guid.NewGuid());
+        var result = await controller.DownloadReceipt(
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.Equal(
+            StatusCodes.Status403Forbidden,
+            Assert.IsType<StatusCodeResult>(result).StatusCode);
     }
 
     private static ExpensesController CreateController(

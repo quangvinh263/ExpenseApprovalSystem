@@ -16,13 +16,15 @@ The feature must follow Clean Architecture:
 ## Assumptions
 
 1. The MVP stores receipt files on the local API host.
-2. Receipts are served as static files from `wwwroot`.
+2. Receipt files are private and are served only through an authorized API
+   endpoint; public static-file serving is not used for receipts.
 3. A receipt may be uploaded only while the expense is `Draft` or `Rejected`.
 4. Uploading a replacement receipt is allowed in those states; the previous
    file is not deleted by this MVP.
-5. The authenticated user must satisfy the existing `ExpenseCreator` policy.
-   Ownership and department authorization remain governed by the existing
-   expense workflow/application rules.
+5. The authenticated user must satisfy the existing `ExpenseCreator` policy
+   and the Application layer must authorize the actor for the target expense:
+   the requester or an active elevated user in the same department
+   (`TeamLead`, `Manager`, `Accountant`, or `Admin`).
 6. The database already contains the nullable `ExpenseRequest.ReceiptUrl`
    column.
 
@@ -58,6 +60,17 @@ Successful response:
 - `Data` contains a relative URL such as
   `/uploads/receipts/0f8fad5b-d9cb-469f-a165-70867728950e.pdf`
 
+### Download receipt
+
+```http
+GET /api/expenses/{id}/receipt
+Authorization: Bearer <access-token>
+```
+
+The endpoint returns the receipt stream only after the same Application
+authorization check. Receipt files are never exposed by a public static-file
+route.
+
 Expected errors:
 
 | Condition | Status |
@@ -76,6 +89,10 @@ Expected errors:
   - `image/jpeg`
   - `image/png`
   - `application/pdf`
+- Declared content type must match the file signature:
+  - JPEG begins with `FF D8 FF`
+  - PNG begins with `89 50 4E 47 0D 0A 1A 0A`
+  - PDF begins with `%PDF-`
 - The expense request must exist.
 - The expense status must be `Draft` or `Rejected`.
 - The stored file name must never use the client-provided file name.
@@ -94,6 +111,12 @@ Task<string> UploadAsync(
     string fileName,
     string contentType,
     CancellationToken cancellationToken);
+
+Task DeleteAsync(string receiptUrl, CancellationToken cancellationToken);
+
+Task<StoredFile> OpenReadAsync(
+    string receiptUrl,
+    CancellationToken cancellationToken);
 ```
 
 ### Command
@@ -101,22 +124,22 @@ Task<string> UploadAsync(
 `UploadReceiptCommand` lives in
 `src/Application/Expenses/UploadReceiptCommand.cs`:
 
-```csharp
-public sealed record UploadReceiptCommand(
-    Guid ExpenseRequestId,
-    IFormFile File) : IRequest<string>;
-```
+The command must contain only Application-friendly inputs:
+`ExpenseRequestId`, `ActorId`, `Stream`, `FileName`, `ContentType`, and `Length`.
+`IFormFile` is bound in the API layer and must not cross into Application.
 
 The handler must:
 
-1. Validate file presence, size, and content type.
+1. Validate file presence, size, declared content type, and magic bytes.
 2. Load the expense request with `AsNoTracking()`.
-3. Reject missing requests with `404` mapping.
-4. Reject invalid statuses with `409` mapping.
-5. Upload through `IFileStorageService`.
-6. Update `ReceiptUrl`, `UpdatedAt`, and `RowVersion`.
-7. Persist through `IApplicationDbContext.SaveChangesAsync`.
-8. Propagate the request `CancellationToken` to all asynchronous operations.
+3. Validate actor authorization in Application.
+4. Reject missing requests with `404` mapping.
+5. Reject invalid statuses with `409` mapping.
+6. Upload through `IFileStorageService`.
+7. Update `ReceiptUrl`, `UpdatedAt`, and `RowVersion`.
+8. Persist through `IApplicationDbContext.SaveChangesAsync`.
+9. Delete the newly uploaded file if persistence fails.
+10. Propagate the request `CancellationToken` to all asynchronous operations.
 
 ## Infrastructure Design
 
@@ -138,7 +161,8 @@ Register the service with dependency injection:
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 ```
 
-Enable static file serving in the API pipeline with `UseStaticFiles()`.
+Do not call `UseStaticFiles()` for receipts. The authorized download endpoint
+must use `OpenReadAsync`.
 
 ## Project Structure
 
@@ -151,7 +175,7 @@ Enable static file serving in the API pipeline with `UseStaticFiles()`.
 - `src/Api/Controllers/ExpensesController.cs`
   — multipart endpoint
 - `src/Api/Program.cs`
-  — DI registration and static-file middleware
+  — DI registration; no public receipt static-file middleware
 - `tests/ExpenseApproval.Application.Tests/`
   — handler and storage-boundary tests
 - `tests/ExpenseApproval.Api.Tests/`
@@ -207,9 +231,10 @@ dotnet test .\ExpenseApproval.slnx --no-restore
 
 ## Boundaries
 
-- Always: validate size and content type before writing; generate server-side
-  file names; use async I/O; preserve Clean Architecture boundaries; use
-  cancellation tokens; test invalid status and file inputs.
+- Always: validate size, declared content type, and magic bytes before writing;
+  generate server-side file names; use async I/O; preserve Clean Architecture
+  boundaries; use cancellation tokens; clean up files when persistence fails;
+  test invalid status and file inputs.
 - Ask first: changing the database schema, adding cloud/object storage,
   changing retention/deletion behavior, or changing the 5 MB/type limits.
 - Never: trust the original file name as a path, allow arbitrary content types,
@@ -226,7 +251,7 @@ dotnet test .\ExpenseApproval.slnx --no-restore
 5. Missing requests return `404`; invalid workflow states return `409`.
 6. Files are stored below `wwwroot/uploads/receipts` using GUID-based names.
 7. `ExpenseRequest.ReceiptUrl` is persisted and returned as a relative URL.
-8. Static-file middleware serves the returned URL.
+8. Receipt download is only available through the authorized API endpoint.
 9. Application, Infrastructure, and API tests pass.
 
 ## Open Questions
