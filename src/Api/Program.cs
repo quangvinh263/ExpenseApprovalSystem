@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
 using ExpenseApproval.Application.Abstractions;
 using ExpenseApproval.Api.Auth;
 using ExpenseApproval.Application.Expenses;
@@ -9,6 +10,7 @@ using ExpenseApproval.Api.Development;
 using ExpenseApproval.Infrastructure.Data;
 using ExpenseApproval.Infrastructure.Storage;
 using Scalar.AspNetCore;
+using Microsoft.OpenApi.Models;
 using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,7 +67,57 @@ builder.Services.AddControllers();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Components ??= new();
+
+        document.Components.SecuritySchemes ??= new Dictionary<string, OpenApiSecurityScheme>();
+
+        document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "Enter your JWT access token"
+        };
+
+        return Task.CompletedTask;
+    });
+
+     options.AddOperationTransformer((operation, context, cancellationToken) =>
+    {
+        var hasAuthorize = context
+            .Description
+            .ActionDescriptor
+            .EndpointMetadata
+            .OfType<IAuthorizeData>()
+            .Any();
+
+        if (hasAuthorize)
+        {
+            operation.Security ??= [];
+
+            operation.Security.Add(
+                new OpenApiSecurityRequirement
+                {
+                    [
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Id = "Bearer",
+                                Type = ReferenceType.SecurityScheme
+                            }
+                        }
+                    ] = []
+                });
+        }
+
+        return Task.CompletedTask;
+    });
+});
 
 var app = builder.Build();
 
